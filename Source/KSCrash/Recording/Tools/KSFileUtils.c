@@ -454,6 +454,21 @@ bool ksfu_openBufferedWriter(KSBufferedWriter* writer, const char* const path, c
     writer->buffer = writeBuffer;
     writer->bufferLength = writeBufferLength;
     writer->position = 0;
+    /*
+     open() 的第二个参数描述的是文件操作的权限
+     #define O_RDONLY        0x0000         open for reading only
+     #define O_WRONLY        0x0001         open for writing only
+     #define O_RDWR          0x0002         open for reading and writing
+     #define O_ACCMODE       0x0003         mask for above mode
+     
+     #define O_CREAT         0x0200         create if nonexistant
+     #define O_TRUNC         0x0400         truncate to zero length
+     #define O_EXCL          0x0800         error if already exists
+     
+     0755：即用户具有读/写/执行权限，组用户和其它用户具有读写权限；
+     0644：即用户具有读写权限，组用户和其它用户具有只读权限；
+     成功则返回文件描述符，若出现则返回 -1
+     */
     writer->fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0644);
     if(writer->fd < 0)
     {

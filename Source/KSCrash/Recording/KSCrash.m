@@ -448,6 +448,7 @@ SYNTHESIZE_CRASH_STATE_PROPERTY(BOOL, crashedLastLaunch)
      }];
 }
 
+//  reportID 读取 crash 内容并转换为 NSData 类型
 - (NSData*) loadCrashReportJSONWithID:(int64_t) reportID
 {
     char* report = kscrash_readReport(reportID);
@@ -490,6 +491,7 @@ SYNTHESIZE_CRASH_STATE_PROPERTY(BOOL, crashedLastLaunch)
     return [self reportWithIntID:[reportID longLongValue]];
 }
 
+//  根据 reportID 找到 crash 信息
 - (NSDictionary*) reportWithIntID:(int64_t) reportID
 {
     NSData* jsonData = [self loadCrashReportJSONWithID:reportID];
@@ -518,6 +520,7 @@ SYNTHESIZE_CRASH_STATE_PROPERTY(BOOL, crashedLastLaunch)
     return crashReport;
 }
 
+// 通过 crash 文件个数、文件夹信息去遍历，一次获取到文件名（文件名的最后一部分就是 reportID），拿到 reportID 再去读取 crash 报告内的文件内容，写入数组
 - (NSArray*) allReports
 {
     int reportCount = kscrash_getReportCount();

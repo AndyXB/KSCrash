@@ -37,7 +37,7 @@
 
          // If you added an alert to the installation, it will interfere with replacing
          // the root view controller. Delaying by 0.3 seconds mitigates this.
-         [self performSelector:@selector(showMainVC) withObject:nil afterDelay:0.3];
+         [self performSelector:@selector(showMainVC) withObject:nil afterDelay:0.5];
      }];
 
 }

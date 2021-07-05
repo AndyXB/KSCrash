@@ -131,9 +131,11 @@ static void setEnabled(bool isEnabled)
         if(isEnabled)
         {
             KSLOG_DEBUG(@"Backing up original handler.");
+            // 记录之前的 OC 异常处理函数
             g_previousUncaughtExceptionHandler = NSGetUncaughtExceptionHandler();
             
             KSLOG_DEBUG(@"Setting new handler.");
+            // 设置新的 OC 异常处理函数
             NSSetUncaughtExceptionHandler(&handleUncaughtException);
             KSCrash.sharedInstance.uncaughtExceptionHandler = &handleUncaughtException;
             KSCrash.sharedInstance.currentSnapshotUserReportedExceptionHandler = &handleCurrentSnapshotUserReportedException;

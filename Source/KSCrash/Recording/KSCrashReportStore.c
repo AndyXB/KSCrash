@@ -72,6 +72,7 @@ static void getCrashReportPathByID(int64_t id, char* pathBuffer)
     
 }
 
+// sprintf(参数1， 格式2) 函数将格式2的值返回到参数1上，然后执行 sscanf(参数1， 参数2， 参数3)，函数将字符串参数1的内容，按照参数2的格式，写入到参数3上。crash 文件命名为 "App名称-report-reportID.json"
 static int64_t getReportIDFromFilename(const char* filename)
 {
     char scanFormat[100];
@@ -82,6 +83,7 @@ static int64_t getReportIDFromFilename(const char* filename)
     return reportID;
 }
 
+// 先通过读取文件夹，遍历文件夹内的文件数量来判断 crash 报告的个数
 static int getReportCount()
 {
     int count = 0;
@@ -108,6 +110,7 @@ done:
     return count;
 }
 
+// 循环读取文件夹内容，根据 ent->d_name 调用 getReportIDFromFilename 函数，来获取 reportID，循环内部填充数组
 static int getReportIDs(int64_t* reportIDs, int count)
 {
     int index = 0;
@@ -210,6 +213,7 @@ int kscrs_getReportIDs(int64_t* reportIDs, int count)
     return count;
 }
 
+// 多线程加锁，通过 reportID 执行 c 函数 getCrashReportPathByID，将路径设置到 path 上。然后执行 ksfu_readEntireFile 读取 crash 信息到 result
 char* kscrs_readReport(int64_t reportID)
 {
     pthread_mutex_lock(&g_mutex);

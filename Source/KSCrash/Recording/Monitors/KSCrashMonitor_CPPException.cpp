@@ -216,6 +216,18 @@ static void setEnabled(bool isEnabled)
             initialize();
 
             ksid_generate(g_eventID);
+            /*
+             定义于头文件 <exception>
+             std::terminate_handler set_terminate( std::terminate_handler f ) throw();
+             (C++11 前)
+             std::terminate_handler set_terminate( std::terminate_handler f ) noexcept;
+             (C++11 起)
+            令 f 为新的全局 terminate_handler 函数并返回先前安装的 std::terminate_handler 。
+
+            此函数是线程安全的。每个对 std::set_terminate 的调用同步于后继的 std::set_terminate 与 std::get_terminate
+
+            (C++11 起)
+             */
             g_originalTerminateHandler = std::set_terminate(CPPExceptionTerminate);
         }
         else

@@ -1599,6 +1599,7 @@ void kscrashreport_writeRecrashReport(const KSCrash_MonitorContext* const monito
     char writeBuffer[1024];
     KSBufferedWriter bufferedWriter;
     static char tempPath[KSFU_MAX_PATH_LENGTH];
+    // 将传递过来的上份 crash report 文件名路径（/var/mobile/Containers/Data/Application/******/Library/Caches/KSCrash/Test/Reports/Test-report-******.json）修改为去掉 .json ，加上 .old 成为新的文件路径 /var/mobile/Containers/Data/Application/******/Library/Caches/KSCrash/Test/Reports/Test-report-******.old
     strncpy(tempPath, path, sizeof(tempPath) - 10);
     strncpy(tempPath + strlen(tempPath) - 5, ".old", 5);
     KSLOG_INFO("Writing recrash report to %s", path);
@@ -1607,13 +1608,14 @@ void kscrashreport_writeRecrashReport(const KSCrash_MonitorContext* const monito
     {
         KSLOG_ERROR("Could not rename %s to %s: %s", path, tempPath, strerror(errno));
     }
+    // 根据传入路径来打开内存写入需要的文件
     if(!ksfu_openBufferedWriter(&bufferedWriter, path, writeBuffer, sizeof(writeBuffer)))
     {
         return;
     }
 
     ksccd_freeze();
-
+    // json 解析的 c 代码
     KSJSONEncodeContext jsonContext;
     jsonContext.userData = &bufferedWriter;
     KSCrashReportWriter concreteWriter;

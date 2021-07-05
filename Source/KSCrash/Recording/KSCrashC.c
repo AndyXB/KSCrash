@@ -129,16 +129,19 @@ static void onCrash(struct KSCrash_MonitorContext* monitorContext)
         kscrashstate_notifyAppCrash();
     }
     monitorContext->consoleLogPath = g_shouldAddConsoleLogToReport ? g_consoleLogPath : NULL;
-
+    // 正在处理 crash 的时候，发生了再次 crash
     if(monitorContext->crashedDuringCrashHandling)
     {
         kscrashreport_writeRecrashReport(monitorContext, g_lastCrashReportFilePath);
     }
     else
     {
+        // 1. 先根据当前时间创建新的 crash 的文件路径
         char crashReportFilePath[KSFU_MAX_PATH_LENGTH];
         int64_t reportID = kscrs_getNextCrashReport(crashReportFilePath);
+        // 2. 将新生成的文件路径保存到 g_lastCrashReportFilePath
         strncpy(g_lastCrashReportFilePath, crashReportFilePath, sizeof(g_lastCrashReportFilePath));
+        // 3. 将新生成的文件路径传入函数进行 crash 写入
         kscrashreport_writeStandardReport(monitorContext, crashReportFilePath);
 
         if(g_reportWrittenCallback)
@@ -182,7 +185,7 @@ KSCrashMonitorType kscrash_install(const char* appName, const char* const instal
     kslog_setLogFilename(g_consoleLogPath, true);
     
     ksccd_init(60);
-
+    // 设置 crash 发生时的 callback 函数
     kscm_setEventCallback(onCrash);
     KSCrashMonitorType monitors = kscrash_setMonitoring(g_monitoring);
 
@@ -335,6 +338,7 @@ int kscrash_getReportIDs(int64_t* reportIDs, int count)
     return kscrs_getReportIDs(reportIDs, count);
 }
 
+// reportID 读取 crash 数据到 char 类型
 char* kscrash_readReport(int64_t reportID)
 {
     if(reportID <= 0)

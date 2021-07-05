@@ -158,7 +158,7 @@ static char g_secondaryEventID[37];
 // ============================================================================
 #pragma mark - Utility -
 // ============================================================================
-
+// 还原异常处理端口，转移控制权
 /** Restore the original mach exception ports.
  */
 static void restoreExceptionPorts(void)
@@ -174,6 +174,7 @@ static void restoreExceptionPorts(void)
     kern_return_t kr;
 
     // Reinstall old exception ports.
+    // for 循环去除保存好的在 KSCrash 之前注册好的异常端口，将每个端口注册回去
     for(mach_msg_type_number_t i = 0; i < g_previousExceptionPorts.count; i++)
     {
         KSLOG_TRACE("Restoring port index %d", i);
@@ -261,7 +262,7 @@ static exception_type_t machExceptionForSignal(int sigNum)
 // ============================================================================
 #pragma mark - Handler -
 // ============================================================================
-
+// 处理异常的逻辑、组装崩溃信息
 /** Our exception handler thread routine.
  * Wait for an exception message, uninstall our exception port, record the
  * exception information, and write a report.
@@ -281,6 +282,7 @@ static void* handleExceptions(void* const userData)
         eventID = g_secondaryEventID;
     }
 
+    // 循环读取注册好的异常端口信息
     for(;;)
     {
         KSLOG_DEBUG("Waiting for mach exception");
@@ -293,6 +295,7 @@ static void* handleExceptions(void* const userData)
                                     g_exceptionPort,
                                     MACH_MSG_TIMEOUT_NONE,
                                     MACH_PORT_NULL);
+        // 获取到信息后则代表发生了 Mach 层异常，跳出 for 循环，组装数据
         if(kr == KERN_SUCCESS)
         {
             break;
@@ -308,8 +311,10 @@ static void* handleExceptions(void* const userData)
     {
         thread_act_array_t threads = NULL;
         mach_msg_type_number_t numThreads = 0;
+        // 挂起所有线程
         ksmc_suspendEnvironment(&threads, &numThreads);
         g_isHandlingCrash = true;
+        // 通知发生了异常
         kscm_notifyFatalExceptionCaptured(true);
 
         KSLOG_DEBUG("Exception handler is installed. Continuing exception handling.");
@@ -334,6 +339,7 @@ static void* handleExceptions(void* const userData)
         }
 
         // Fill out crash information
+        // 组装异常所需要的方案现场信息
         KSLOG_DEBUG("Fetching machine state.");
         KSMC_NEW_CONTEXT(machineContext);
         KSCrash_MonitorContext* crashContext = &g_monitorContext;
@@ -444,6 +450,7 @@ static void uninstallExceptionHandler()
     KSLOG_DEBUG("Mach exception handlers uninstalled.");
 }
 
+// 注册 Mach 层异常监听
 static bool installExceptionHandler()
 {
     KSLOG_DEBUG("Installing mach exception handler.");
@@ -454,6 +461,7 @@ static bool installExceptionHandler()
     kern_return_t kr;
     int error;
 
+    // 拿到当前进程
     const task_t thisTask = mach_task_self();
     exception_mask_t mask = EXC_MASK_BAD_ACCESS |
     EXC_MASK_BAD_INSTRUCTION |
@@ -462,6 +470,7 @@ static bool installExceptionHandler()
     EXC_MASK_BREAKPOINT;
 
     KSLOG_DEBUG("Backing up original exception ports.");
+    // 获取该 Task 上的注册好的异常端口
     kr = task_get_exception_ports(thisTask,
                                   mask,
                                   g_previousExceptionPorts.masks,
@@ -469,15 +478,18 @@ static bool installExceptionHandler()
                                   g_previousExceptionPorts.ports,
                                   g_previousExceptionPorts.behaviors,
                                   g_previousExceptionPorts.flavors);
+    // 获取失败走 failed 逻辑
     if(kr != KERN_SUCCESS)
     {
         KSLOG_ERROR("task_get_exception_ports: %s", mach_error_string(kr));
         goto failed;
     }
 
+    // KSCrash 的异常为空则走执行逻辑
     if(g_exceptionPort == MACH_PORT_NULL)
     {
         KSLOG_DEBUG("Allocating new port with receive rights.");
+        // 申请异常处理端口
         kr = mach_port_allocate(thisTask,
                                 MACH_PORT_RIGHT_RECEIVE,
                                 &g_exceptionPort);
@@ -488,6 +500,7 @@ static bool installExceptionHandler()
         }
 
         KSLOG_DEBUG("Adding send rights to port.");
+        // 为异常处理端口申请权限：MACH_MSG_TYPE_MAKE_SEND
         kr = mach_port_insert_right(thisTask,
                                     g_exceptionPort,
                                     g_exceptionPort,
@@ -500,6 +513,7 @@ static bool installExceptionHandler()
     }
 
     KSLOG_DEBUG("Installing port as exception handler.");
+    // 为该 Task 设置异常处理端口
     kr = task_set_exception_ports(thisTask,
                                   mask,
                                   g_exceptionPort,
@@ -515,6 +529,7 @@ static bool installExceptionHandler()
     pthread_attr_init(&attr);
     attributes_created = true;
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    // 设置监控线程
     error = pthread_create(&g_secondaryPThread,
                            &attr,
                            &handleExceptions,
@@ -524,6 +539,7 @@ static bool installExceptionHandler()
         KSLOG_ERROR("pthread_create_suspended_np: %s", strerror(error));
         goto failed;
     }
+    // 转换为 Mach 内核线程
     g_secondaryMachThread = pthread_mach_thread_np(g_secondaryPThread);
     ksmc_addReservedThread(g_secondaryMachThread);
 
@@ -551,6 +567,7 @@ failed:
     {
         pthread_attr_destroy(&attr);
     }
+    // 还原之前的异常注册端口，将控制权还原
     uninstallExceptionHandler();
     return false;
 }

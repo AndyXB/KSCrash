@@ -93,7 +93,7 @@ static void handleSignal(int sigNum, siginfo_t* signalInfo, void* userContext)
         KSMC_NEW_CONTEXT(machineContext);
         ksmc_getContextForSignal(userContext, machineContext);
         kssc_initWithMachineContext(&g_stackCursor, KSSC_MAX_STACK_DEPTH, machineContext);
-
+        // 记录信号处理时的上下文信息
         KSCrash_MonitorContext* crashContext = &g_monitorContext;
         memset(crashContext, 0, sizeof(*crashContext));
         crashContext->crashType = KSCrashMonitorTypeSignal;
@@ -125,15 +125,17 @@ static bool installSignalHandler()
     KSLOG_DEBUG("Installing signal handler.");
 
 #if KSCRASH_HAS_SIGNAL_STACK
-
+    // 在堆上分配一块内存
     if(g_signalStack.ss_size == 0)
     {
         KSLOG_DEBUG("Allocating signal stack area.");
         g_signalStack.ss_size = SIGSTKSZ;
         g_signalStack.ss_sp = malloc(g_signalStack.ss_size);
     }
-
+    // 信号处理函数的栈挪到堆中，而不和进程共用一块栈区
+    // sigaltstack() 函数，该函数的第 1 个参数 sigstack 是一个 stack_t 结构的指针，该结构存储了一个“可替换信号栈” 的位置及属性信息。第 2 个参数 old_sigstack 也是一个 stack_t 类型指针，它用来返回上一次建立的“可替换信号栈”的信息(如果有的话)
     KSLOG_DEBUG("Setting signal stack area.");
+    // sigaltstack 第一个参数为创建的新的可替换信号栈，第二个参数可以设置为NULL，如果不为NULL的话，会将旧的可替换信号栈的信息保存在里面。函数成功返回0，失败返回-1.
     if(sigaltstack(&g_signalStack, NULL) != 0)
     {
         KSLOG_ERROR("signalstack: %s", strerror(errno));
@@ -151,7 +153,9 @@ static bool installSignalHandler()
                                           * (unsigned)fatalSignalsCount);
     }
 
+    // 设置信号处理函数 sigaction 的第二个参数，类型为 sigaction 结构体
     struct sigaction action = {{0}};
+    // sa_flags 成员设立 SA_ONSTACK 标志，该标志告诉内核信号处理函数的栈帧就在“可替换信号栈”上建立。
     action.sa_flags = SA_SIGINFO | SA_ONSTACK;
 #if KSCRASH_HOST_APPLE && defined(__LP64__)
     action.sa_flags |= SA_64REGSET;
@@ -159,8 +163,10 @@ static bool installSignalHandler()
     sigemptyset(&action.sa_mask);
     action.sa_sigaction = &handleSignal;
 
+    // 遍历需要处理的信号数组
     for(int i = 0; i < fatalSignalsCount; i++)
     {
+        // 将每个信号的处理函数绑定到上面声明的 action 去，另外用 g_previousSignalHandlers 保存当前信号的处理函数
         KSLOG_DEBUG("Assigning handler for signal %d", fatalSignals[i]);
         if(sigaction(fatalSignals[i], &action, &g_previousSignalHandlers[i]) != 0)
         {
@@ -194,7 +200,7 @@ static void uninstallSignalHandler(void)
 
     const int* fatalSignals = kssignal_fatalSignals();
     int fatalSignalsCount = kssignal_numFatalSignals();
-
+    // 遍历需要处理信号数组，将之前的信号处理函数还原
     for(int i = 0; i < fatalSignalsCount; i++)
     {
         KSLOG_DEBUG("Restoring original handler for signal %d", fatalSignals[i]);

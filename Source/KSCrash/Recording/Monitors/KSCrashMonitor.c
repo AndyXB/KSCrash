@@ -238,12 +238,14 @@ void kscm_handleException(struct KSCrash_MonitorContext* context)
     for(int i = 0; i < g_monitorsCount; i++)
     {
         Monitor* monitor = &g_monitors[i];
+        // 判断当前的 crash 监控是开启状态
         if(isMonitorEnabled(monitor))
         {
+            // 针对每种 crash 类型做一些额外的补充信息
             addContextualInfoToEvent(monitor, context);
         }
     }
-
+    // 真正处理 crash 信息，保存 json 格式的 crash 信息
     g_onExceptionEvent(context);
 
     if (context->currentSnapshotUserReported) {
